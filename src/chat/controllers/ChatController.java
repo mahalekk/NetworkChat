@@ -1,47 +1,59 @@
 package chat.controllers;
 
-import javafx.application.Platform;
+import chat.models.Network;
+import javafx.collections.FXCollections;
 import javafx.fxml.FXML;
-import javafx.scene.control.*;
-import java.text.SimpleDateFormat;
-import java.util.*;
+import javafx.scene.control.Button;
+import javafx.scene.control.Label;
+import javafx.scene.control.ListView;
+import javafx.scene.control.TextArea;
+import javafx.scene.control.TextField;
 
 public class ChatController {
 
     @FXML
-    private TextArea textInputField;
+    private ListView<String> usersList;
 
     @FXML
-    private TextArea commonTextPanel;
-
-    Date date = new Date ();
-    SimpleDateFormat formatter = new SimpleDateFormat("dd-MM-yyyy HH:mm:ss");
+    private Label usernameTitle;
 
     @FXML
-    void pushTextToPanel() {
-        String message = textInputField.getText ().trim ();
+    private TextArea chatHistory;
 
-        if (message.length () != 0) {
-            commonTextPanel.appendText (message + " " + formatter.format (date) + "\n");
-            textInputField.clear ();
-        } else {
-            Alert alert = new Alert (Alert.AlertType.ERROR);
-            alert.setTitle ("Ошибка ввода!!");
-            alert.setHeaderText ("Текст не должен быть пустой");
-            alert.show ();
+    @FXML
+    private TextField textInputField;
+
+    @FXML
+    private Button sendButton;
+
+    @FXML
+    public void initialize() {
+        usersList.setItems(FXCollections.observableArrayList("Тимофей", "Дмитрий", "Диана", "Арман"));
+        sendButton.setOnAction(event -> sendMessage());
+        textInputField.setOnAction(event -> sendMessage());
+    }
+
+    private Network network;
+
+    public void setNetwork(Network network) {
+        this.network = network;
+    }
+
+    private void sendMessage() {
+        String message = textInputField.getText().trim();
+        textInputField.clear();
+
+        if (message.trim().isEmpty()) {
+            return;
         }
+        network.sendMessage(message);
+        appendMessage(message);
     }
 
-    @FXML
-    void exitFromChat() {
-        Platform.exit ();
+    public void appendMessage(String message) {
+        chatHistory.appendText(message);
+        chatHistory.appendText(System.lineSeparator());
     }
 
-    @FXML
-    void showAbout() {
-        Alert alert = new Alert (Alert.AlertType.INFORMATION);
-        alert.setTitle ("Информация о разработчике");
-        alert.setContentText ("Данный чат был разработан в рамказ учебной программы факультета Java-разработки Беймишевым А.С.");
-        alert.show ();
-    }
+
 }
