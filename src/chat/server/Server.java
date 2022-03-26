@@ -3,13 +3,12 @@ package chat.server;
 import chat.server.authentication.AuthenticationService;
 import chat.server.authentication.BaseAuthenticationService;
 import chat.server.handler.ClientHandler;
-
-import javax.print.DocFlavor;
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 
 
 public class Server {
@@ -17,12 +16,14 @@ public class Server {
     private final AuthenticationService authenticationService;
     private final List<ClientHandler> clients;
 
+    ObservableList<String> list = FXCollections.observableArrayList ();
+
     public Server(int port) throws IOException {
         serverSocket = new ServerSocket(port);
         authenticationService = new BaseAuthenticationService ();
         clients = new ArrayList<> ();
-    }
 
+    }
 
     public void start() {
         System.out.println("СЕРВЕР ЗАПУЩЕН!");
@@ -70,21 +71,40 @@ public class Server {
     public AuthenticationService getAuthenticationService() {
         return authenticationService;
     }
-    public synchronized void broadcastPrivateMessage (String recipient, String message, ClientHandler sender) throws IOException {
+    public synchronized void broadcastPrivateMessage (String recipient, String privateMessage, ClientHandler sender) throws IOException {
         for (ClientHandler client : clients) {
             if (client.getUsername ().equals (recipient)) {
-                client.sendPrivateMessage (sender.getUsername (), message);
-                break;
+                client.sendMessage (sender.getUsername (), privateMessage);
+                }
             }
         }
-            return;
-        }
-    public synchronized void broadcastMessage(String message, ClientHandler sender) throws IOException {
+    public synchronized void broadcastMessage(String message, ClientHandler sender, boolean isServerMessage) throws IOException {
         for (ClientHandler client : clients) {
             if (client == sender) {
                 continue;
             }
-            client.sendMessage(sender.getUsername(), message);
+            client.sendMessage(isServerMessage ? null : sender.getUsername(), message);
+        }
+    }
+
+    public synchronized void broadcastMessage(String message, ClientHandler sender) throws IOException {
+        broadcastMessage(message, sender, false);
+    }
+
+    public void disconnectClient(ClientHandler sender) throws IOException {
+        for (ClientHandler client : clients) {
+            if (client == sender) {
+                continue;
+            }
+            client.sendServerMessage (String.format ("Пользователь %s отключился", sender.getUsername ()));
+            client.sendUserList (clients);
+        }
+    }
+
+    public void connectClient (ClientHandler sender) throws IOException {
+        for (ClientHandler client : clients) {
+            client.sendServerMessage (String.format ("Пользователь %s подключился", sender.getUsername ()));
+            client.sendUserList (clients);
         }
     }
 }

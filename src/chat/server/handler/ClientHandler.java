@@ -2,32 +2,32 @@ package chat.server.handler;
 
 import chat.server.Server;
 import chat.server.authentication.AuthenticationService;
-
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.Socket;
+import java.util.List;
 
 public class ClientHandler {
     private static final String AUTH_CMD_PREFIX = "/auth"; // + login + password
     private static final String AUTHOK_CMD_PREFIX = "/authok"; // + username
     private static final String AUTHERR_CMD_PREFIX = "/autherr"; // + error message
-    private static final String CLIENT_MSG_CMD_PREFIX = "/cMsg"; // + msg
-    private static final String SERVER_MSG_CMD_PREFIX = "/sMsg"; // + msg
-    private static final String PRIVATE_MSG_CMD_PREFIX = "/pMsg"; // + msg
+    private static final String CLIENT_MSG_CMD_PREFIX = "/cm"; // + msg
+    private static final String SERVER_MSG_CMD_PREFIX = "/sm"; // + msg
+    private static final String PRIVATE_MSG_CMD_PREFIX = "/pm"; // + msg
     private static final String STOP_SERVER_CMD_PREFIX = "/stop";
     private static final String END_CLIENT_CMD_PREFIX = "/end";
+    private static final String GET_CLIENTS_CMD_PREFIX = "/clients";
 
     private Server server;
     private Socket clientSocket;
     private DataOutputStream out;
     private DataInputStream in;
     private String username;
-    private ClientHandler recipient;
 
-    public ClientHandler(Server myServer, Socket socket) {
+    public ClientHandler(Server server, Socket socket) {
 
-        this.server = myServer;
+        this.server = server;
         clientSocket = socket;
     }
 
@@ -41,9 +41,16 @@ public class ClientHandler {
                 readMessage();
             } catch (IOException e) {
                 e.printStackTrace();
+                server.unSubscribe (this);
+                try {
+                    server.disconnectClient(this);
+                } catch (IOException exception) {
+                    exception.printStackTrace ();
+                }
             }
         }).start();
     }
+
 
     private void authentication() throws IOException {
         while (true) {
@@ -82,9 +89,12 @@ public class ClientHandler {
             out.writeUTF(AUTHOK_CMD_PREFIX + " " + username);
             server.subscribe(this);
             System.out.println("Пользователь " + username + " подключился к чату");
+            server.broadcastMessage (String.format (">>> %s подключился к чату", username ), this, true);
+            server.connectClient (this);
+
             return true;
         } else {
-            out.writeUTF(AUTHERR_CMD_PREFIX + " Логин или пароль не соответствуют действительности");
+            out.writeUTF(AUTHERR_CMD_PREFIX + " Логин или пароль не соответствуют");
             return false;
         }
     }
@@ -98,7 +108,10 @@ public class ClientHandler {
             } else if (message.startsWith(END_CLIENT_CMD_PREFIX)) {
                 return;
             } else if (message.startsWith(PRIVATE_MSG_CMD_PREFIX)) {
-                server.broadcastPrivateMessage (this.getRecipientName(message), message, this);
+                String[] parts = message.split ("\\s+", 3);
+                String recipient = parts[1];
+                String privateMessage = parts[2];
+                server.broadcastPrivateMessage (recipient, privateMessage, this);
             } else {
                 server.broadcastMessage(message, this);
             }
@@ -106,19 +119,29 @@ public class ClientHandler {
         }
     }
 
-    private String getRecipientName (String message) {
-        String[] name = message.split ("\\s+");
-        return name[1];
-    }
     public void sendMessage(String sender, String message) throws IOException {
-        out.writeUTF(String.format("%s %s %s", CLIENT_MSG_CMD_PREFIX, sender, message));
+        if (sender != null) {
+            out.writeUTF(String.format("%s %s %s", CLIENT_MSG_CMD_PREFIX, sender, message));
+        }
     }
 
-    public void sendPrivateMessage(String sender, String message) throws IOException {
-        out.writeUTF(String.format("%s %s %s", PRIVATE_MSG_CMD_PREFIX, sender, message));
+    public void sendServerMessage(String message) throws IOException {
+            out.writeUTF (String.format ("%s %s", SERVER_MSG_CMD_PREFIX, message));
     }
+
 
     public String getUsername() {
+        return username;
+    }
+
+    public void sendUserList(List<ClientHandler> clients) throws IOException {
+        String message = String.format ("%s %s", GET_CLIENTS_CMD_PREFIX, clients.toString());
+        out.writeUTF (message);
+        System.out.println (message);
+    }
+
+    @Override
+    public String toString() {
         return username;
     }
 }
