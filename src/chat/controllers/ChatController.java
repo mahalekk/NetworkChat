@@ -1,13 +1,13 @@
 package chat.controllers;
 
 import chat.models.Network;
-import javafx.collections.FXCollections;
 import javafx.fxml.FXML;
-import javafx.scene.control.Button;
-import javafx.scene.control.Label;
-import javafx.scene.control.ListView;
-import javafx.scene.control.TextArea;
-import javafx.scene.control.TextField;
+import javafx.scene.control.*;
+import javafx.scene.input.MouseEvent;
+import java.text.DateFormat;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Date;
 
 public class ChatController {
 
@@ -25,12 +25,33 @@ public class ChatController {
 
     @FXML
     private Button sendButton;
+    private String selectedRecipient;
 
     @FXML
     public void initialize() {
-        usersList.setItems(FXCollections.observableArrayList("Тимофей", "Дмитрий", "Диана", "Арман"));
-        sendButton.setOnAction(event -> sendMessage());
-        textInputField.setOnAction(event -> sendMessage());
+        sendButton.setOnAction (event -> sendMessage ());
+        textInputField.setOnAction (event -> sendMessage ());
+
+        usersList.setCellFactory (lv -> {
+            MultipleSelectionModel<String> selectionModel = usersList.getSelectionModel ();
+            ListCell<String> cell = new ListCell<> ();
+            cell.textProperty().bind (cell.itemProperty ());
+            cell.addEventFilter(MouseEvent.MOUSE_PRESSED, event -> {
+                usersList.requestFocus ();
+                if (!cell.isEmpty ()) {
+                    int index = cell.getIndex ();
+                    if (selectionModel.getSelectedIndices ().contains (index)) {
+                        selectionModel.clearSelection (index);
+                        selectedRecipient = null;
+                    } else {
+                        selectionModel.select (index);
+                        selectedRecipient = cell.getItem ();
+                    }
+                    event.consume ();
+                }
+            });
+            return cell;
+        });
     }
 
     private Network network;
@@ -40,20 +61,49 @@ public class ChatController {
     }
 
     private void sendMessage() {
-        String message = textInputField.getText().trim();
-        textInputField.clear();
+        String message = textInputField.getText ().trim ();
+        textInputField.clear ();
 
-        if (message.trim().isEmpty()) {
+        if (message.trim ().isEmpty ()) {
             return;
         }
-        network.sendMessage(message);
-        appendMessage(message);
+
+        if (selectedRecipient != null) {
+            network.sendPrivateMessage (selectedRecipient, message);
+        } else {
+            network.sendMessage (message);
+        }
+        appendMessage ("Я: " + message);
     }
 
     public void appendMessage(String message) {
-        chatHistory.appendText(message);
-        chatHistory.appendText(System.lineSeparator());
+        String timestamp = DateFormat.getInstance ().format (new Date ());
+
+        chatHistory.appendText (timestamp);
+        chatHistory.appendText (System.lineSeparator ());
+        chatHistory.appendText (message);
+        chatHistory.appendText (System.lineSeparator ());
+        chatHistory.appendText (System.lineSeparator ());
     }
 
+    public void appendServerMessage(String serverMessage) {
+        chatHistory.appendText (serverMessage);
+        chatHistory.appendText (System.lineSeparator ());
+        chatHistory.appendText (System.lineSeparator ());
+    }
 
+    public void setUsernameTitle(String username) {
+        this.usernameTitle.setText (username);
+    }
+
+    public void updateUsersList(String[] users) {
+        Arrays.sort (users);
+        for (int i = 0; i < users.length; i++) {
+            if(users[i].equals(network.getUsername ())) {
+                users[i] = ">>> " + users[i];
+            }
+        usersList.getItems ().clear ();
+            Collections.addAll (usersList.getItems (), users);
+        }
+    }
 }

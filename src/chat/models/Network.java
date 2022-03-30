@@ -1,6 +1,9 @@
 package chat.models;
 
 import chat.controllers.ChatController;
+import chat.server.Server;
+import chat.server.handler.ClientHandler;
+import javafx.application.Platform;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
@@ -8,10 +11,26 @@ import java.net.Socket;
 import java.util.Scanner;
 
 public class Network {
+    private static final String AUTH_CMD_PREFIX = "/auth"; // + login + password
+    private static final String AUTHOK_CMD_PREFIX = "/authok"; // + username
+    private static final String AUTHERR_CMD_PREFIX = "/autherr"; // + error message
+
+    private static final String CLIENT_MSG_CMD_PREFIX = "/cm"; // + msg
+    private static final String GET_CLIENTS_CMD_PREFIX = "/clients";
+
+    private static final String SERVER_MSG_CMD_PREFIX = "/sm"; // + msg
+    private static final String STOP_SERVER_CMD_PREFIX = "/stop";
+
+    private static final String PRIVATE_MSG_CMD_PREFIX = "/pm"; // + msg
+
+    private static final String END_CLIENT_CMD_PREFIX = "/end";
+
     public static final String DEFAULT_HOST = "localhost";
     public static final int DEFAULT_PORT = 8180;
     private DataInputStream in;
     private DataOutputStream out;
+
+    private String username;
 
     private final String host;
     private final int port;
@@ -21,11 +40,12 @@ public class Network {
         this.port = port;
     }
 
+    public Server server;
+
     public Network() {
         this.host = DEFAULT_HOST;
         this.port = DEFAULT_PORT;
     }
-
 
     public void connect() {
         try {
@@ -38,10 +58,6 @@ public class Network {
             e.printStackTrace();
             System.out.println("Соединение не установлено");
         }
-    }
-
-    public DataOutputStream getOut() {
-        return out;
     }
 
     public void sendMessage(String message) {
@@ -57,9 +73,23 @@ public class Network {
         Thread t = new Thread(() -> {
             try {
                 while (true) {
-                    String message = in.readUTF();
-                    System.out.println (message);
-                    chatController.appendMessage("Я: " + message);
+                    String message = in.readUTF ();
+                    if (message.startsWith (CLIENT_MSG_CMD_PREFIX)) {
+                        String[] parts = message.split ("\\s+", 3);
+                        String sender = parts[1];
+                        String messageFromSender = parts[2];
+                        Platform.runLater (() -> chatController.appendMessage (String.format ("%s: %s", sender, messageFromSender)));
+
+                    } else if (message.startsWith (SERVER_MSG_CMD_PREFIX)) {
+                        String[] parts = message.split ("\\s+", 2);
+                        String serverMessage = parts[1];
+                        Platform.runLater (() -> chatController.appendServerMessage (serverMessage));
+
+                    }  else if (message.startsWith (GET_CLIENTS_CMD_PREFIX)) {
+                        message = message.substring (message.indexOf ('[') + 1, message.indexOf (']'));
+                        String[] users = message.split (", ");
+                        Platform.runLater (() -> chatController.updateUsersList (users));
+                    }
                 }
             } catch (IOException e) {
                 e.printStackTrace();
@@ -71,20 +101,27 @@ public class Network {
 
     }
 
-    public void sendMessageToConsole (ChatController chatController) {
-        Thread t = new Thread(() -> {
-            try {
-                while (true) {
-                    Scanner scanner = new Scanner (System.in);
-                    String message = scanner.next();
-                    out.writeUTF (message.toUpperCase ());
-                }
-            } catch (Exception e) {
-                e.printStackTrace();
+    public String sendAuthMessage(String login, String password) {
+        try {
+            out.writeUTF (String.format ("%s %s %s", AUTH_CMD_PREFIX, login, password));
+            String response = in.readUTF ();
+            if (response.startsWith (AUTHOK_CMD_PREFIX)) {
+                this.username = response.split ("\\s+", 2)[1];
+                return null;
+            } else {
+                return response.split ("\\s+",2)[1];
             }
-        });
-        t.setDaemon(true);
-        t.start();
+        } catch (IOException e) {
+            e.printStackTrace ();
+            return e.getMessage ();
+        }
+    }
 
+    public String getUsername() {
+        return username;
+    }
+
+    public void sendPrivateMessage(String selectedRecipient, String message) {
+    sendMessage (String.format ("%s %s %s", PRIVATE_MSG_CMD_PREFIX, selectedRecipient, message));
     }
 }

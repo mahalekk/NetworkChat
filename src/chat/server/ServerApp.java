@@ -1,7 +1,5 @@
 package chat.server;
 
-import chat.server.Server;
-
 import java.io.IOException;
 
 public class ServerApp {
