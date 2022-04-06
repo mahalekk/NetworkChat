@@ -44,6 +44,7 @@
                                                                 <Font size="18.0" />
                                                             </font>
                                                         </Label>
+                                                        <Button fx:id="changeUsernameBtn" layoutX="14.0" mnemonicParsing="false" onAction="#changeUsername" prefHeight="42.0" prefWidth="140.0" text="Change username" />
                                                     </children>
                                                     <HBox.margin>
                                                         <Insets />

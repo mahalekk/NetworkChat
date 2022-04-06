@@ -6,6 +6,7 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.Socket;
+import java.sql.SQLException;
 import java.util.List;
 
 public class ClientHandler {
@@ -13,6 +14,7 @@ public class ClientHandler {
     private static final String AUTHOK_CMD_PREFIX = "/authok"; // + username
     private static final String AUTHERR_CMD_PREFIX = "/autherr"; // + error message
     private static final String CLIENT_MSG_CMD_PREFIX = "/cm"; // + msg
+    private static final String CHANGE_USERNAME_PREFIX = "/change";
     private static final String SERVER_MSG_CMD_PREFIX = "/sm"; // + msg
     private static final String PRIVATE_MSG_CMD_PREFIX = "/pm"; // + msg
     private static final String STOP_SERVER_CMD_PREFIX = "/stop";
@@ -24,6 +26,10 @@ public class ClientHandler {
     private DataOutputStream out;
     private DataInputStream in;
     private String username;
+
+    public void setUsername(String username) {
+        this.username = username;
+    }
 
     public ClientHandler(Server server, Socket socket) {
 
@@ -47,12 +53,14 @@ public class ClientHandler {
                 } catch (IOException exception) {
                     exception.printStackTrace ();
                 }
+            } catch (SQLException | ClassNotFoundException e) {
+                throw new RuntimeException (e);
             }
         }).start();
     }
 
 
-    private void authentication() throws IOException {
+    private void authentication() throws IOException, SQLException, ClassNotFoundException {
         while (true) {
             String message = in.readUTF();
             if (message.startsWith(AUTH_CMD_PREFIX)) {
@@ -68,14 +76,14 @@ public class ClientHandler {
         }
     }
 
-    private boolean processAuthentication(String message) throws IOException {
+    private boolean processAuthentication(String message) throws IOException, SQLException, ClassNotFoundException {
         String[] parts = message.split("\\s+");
         if (parts.length != 3) {
             out.writeUTF(AUTHERR_CMD_PREFIX + " Ошибка аутентификации");
         }
         String login = parts[1];
         String password = parts[2];
-
+        System.out.println (server.getAuthenticationService ().toString ());
         AuthenticationService auth = server.getAuthenticationService();
 
         username = auth.getUsernameByLoginAndPassword(login, password);
@@ -112,8 +120,14 @@ public class ClientHandler {
                 String recipient = parts[1];
                 String privateMessage = parts[2];
                 server.broadcastPrivateMessage (recipient, privateMessage, this);
+            } else if (message.startsWith(CHANGE_USERNAME_PREFIX)) {
+                String[] parts = message.split ("\\s+", 3);
+                String oldUsername = parts[1];
+                String newUsername = parts[2];
+                System.out.println ("acceptMessageOnClientHandler " + message);
+                server.updateClientUsername (this, oldUsername, newUsername);
             } else {
-                server.broadcastMessage(message, this);
+                server.broadcastMessage(message,this);
             }
 
         }
@@ -126,7 +140,7 @@ public class ClientHandler {
     }
 
     public void sendServerMessage(String message) throws IOException {
-            out.writeUTF (String.format ("%s %s", SERVER_MSG_CMD_PREFIX, message));
+        out.writeUTF (String.format ("%s %s", SERVER_MSG_CMD_PREFIX, message));
     }
 
 
@@ -135,7 +149,7 @@ public class ClientHandler {
     }
 
     public void sendUserList(List<ClientHandler> clients) throws IOException {
-        String message = String.format ("%s %s", GET_CLIENTS_CMD_PREFIX, clients.toString());
+        String message = String.format ("%s %s", GET_CLIENTS_CMD_PREFIX, clients.toString ());
         out.writeUTF (message);
         System.out.println (message);
     }
