@@ -1,11 +1,14 @@
 package chat;
 
+import chat.controllers.ChangeUsernameController;
 import chat.controllers.ChatController;
 import chat.controllers.AuthController;
+import chat.controllers.RegController;
 import chat.models.Network;
 import javafx.application.Application;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Scene;
+import javafx.scene.control.Button;
 import javafx.stage.Stage;
 import javafx.stage.Modality;
 import javafx.scene.control.Alert;
@@ -19,6 +22,11 @@ public class StartClient extends Application {
     private Network network;
     private Stage primaryStage;
     private Stage authStage;
+
+    private Stage regStage;
+
+
+    private Stage usnmStage;
     private ChatController chatController;
 
     @Override
@@ -33,24 +41,42 @@ public class StartClient extends Application {
         createChatDialog ();
 
     }
-    private void openAuthDialog () throws IOException {
+    public void openAuthDialog () throws IOException {
         FXMLLoader authLoader = new FXMLLoader (StartClient.class.getResource ("resources/auth-view.fxml"));
         authStage = new Stage ();
-        Scene scene = new Scene (authLoader.load ());
-
-        authStage.setScene (scene);
-        authStage.initModality (Modality.WINDOW_MODAL);
-        authStage.initOwner (primaryStage);
-        authStage.setTitle ("Authentication");
-        authStage.setY (1500);
-        authStage.setX (1000);
-        authStage.setAlwaysOnTop (true);
-        authStage.show ();
-
+        createStage(authStage, authLoader, "Authentication");
         AuthController chatController = authLoader.getController ();
         chatController.setNetwork (network);
         chatController.setStartClient (this);
     }
+
+    public void openRegDialog() throws IOException {
+        authStage.close ();
+        FXMLLoader regLoader = new FXMLLoader (StartClient.class.getResource ("resources/reg-view.fxml"));
+        regStage = new Stage ();
+        createStage (regStage, regLoader, "Registration");
+        RegController regController = regLoader.getController ();
+        regController.setNetwork (network);
+        regController.setStartClient (this);
+    }
+
+    public void closeRegDialog () {
+        regStage.close();
+    }
+
+    // Выделил в отдельный метод, чтобы не дублировать
+    private void createStage(Stage stage, FXMLLoader loader, String title) throws IOException {
+        Scene scene = new Scene (loader.load ());
+        stage.setScene (scene);
+        stage.initModality (Modality.WINDOW_MODAL);
+        stage.initOwner (primaryStage);
+        stage.setTitle (title);
+        stage.setY (1500);
+        stage.setX (1000);
+        stage.setAlwaysOnTop (true);
+        stage.show ();
+    }
+
     private void createChatDialog() throws IOException {
         FXMLLoader fxmlLoader = new FXMLLoader(StartClient.class.getResource("resources/chat-view.fxml"));
         Scene scene = new Scene(fxmlLoader.load (), 600,400);
@@ -71,6 +97,7 @@ public class StartClient extends Application {
         primaryStage.setTitle (network.getUsername ());
         network.waitMessage (chatController);
         chatController.setUsernameTitle (network.getUsername ());
+        chatController.setStartClient(this);
     }
 
     public void showErrorAlert(String title, String errorMessage) {
@@ -78,5 +105,13 @@ public class StartClient extends Application {
         alert.setTitle (title);
         alert.setHeaderText (errorMessage);
         alert.show ();
+    }
+
+    public void openChangeUsernameDialog() throws IOException {
+        FXMLLoader changeUsernameLoader = new FXMLLoader (StartClient.class.getResource ("resources/changeUsername-view.fxml"));
+        usnmStage = new Stage ();
+        createStage (usnmStage, changeUsernameLoader, "Change username");
+        ChangeUsernameController changeController = changeUsernameLoader.getController ();
+        changeController.setNetwork (network);
     }
 }

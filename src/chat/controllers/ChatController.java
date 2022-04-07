@@ -1,9 +1,12 @@
 package chat.controllers;
 
+import chat.StartClient;
 import chat.models.Network;
 import javafx.fxml.FXML;
 import javafx.scene.control.*;
 import javafx.scene.input.MouseEvent;
+
+import java.io.IOException;
 import java.text.DateFormat;
 import java.util.Arrays;
 import java.util.Collections;
@@ -25,11 +28,22 @@ public class ChatController {
 
     @FXML
     private Button sendButton;
+
+    @FXML
+    private Button changeUsernameBtn;
     private String selectedRecipient;
+    private StartClient startClient;
 
     @FXML
     public void initialize() {
         sendButton.setOnAction (event -> sendMessage ());
+        changeUsernameBtn.setOnAction (event -> {
+            try {
+                changeUsername();
+            } catch (IOException e) {
+                throw new RuntimeException (e);
+            }
+        });
         textInputField.setOnAction (event -> sendMessage ());
 
         usersList.setCellFactory (lv -> {
@@ -52,6 +66,11 @@ public class ChatController {
             });
             return cell;
         });
+    }
+
+    public void changeUsername() throws IOException {
+        startClient.openChangeUsernameDialog();
+
     }
 
     private Network network;
@@ -102,8 +121,11 @@ public class ChatController {
             if(users[i].equals(network.getUsername ())) {
                 users[i] = ">>> " + users[i];
             }
-        usersList.getItems ().clear ();
+            usersList.getItems ().clear ();
             Collections.addAll (usersList.getItems (), users);
         }
+    }
+    public void setStartClient(StartClient startClient) {
+        this.startClient = startClient;
     }
 }

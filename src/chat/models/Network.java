@@ -2,28 +2,26 @@ package chat.models;
 
 import chat.controllers.ChatController;
 import chat.server.Server;
-import chat.server.handler.ClientHandler;
 import javafx.application.Platform;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.Socket;
-import java.util.Scanner;
+import java.util.Arrays;
+
 
 public class Network {
     private static final String AUTH_CMD_PREFIX = "/auth"; // + login + password
     private static final String AUTHOK_CMD_PREFIX = "/authok"; // + username
-    private static final String AUTHERR_CMD_PREFIX = "/autherr"; // + error message
-
     private static final String CLIENT_MSG_CMD_PREFIX = "/cm"; // + msg
     private static final String GET_CLIENTS_CMD_PREFIX = "/clients";
-
+    private static final String CHANGE_USERNAME_PREFIX = "/change";
     private static final String SERVER_MSG_CMD_PREFIX = "/sm"; // + msg
-    private static final String STOP_SERVER_CMD_PREFIX = "/stop";
+    private static final String NEW_CLIENT_REG_PREFIX = "/stop";
+    private static final String CLIENT_OK_REG_PREFIX = "/regok";
+    private static final String CLIENT_ERR_REG_PREFIX = "/regerr";
 
     private static final String PRIVATE_MSG_CMD_PREFIX = "/pm"; // + msg
-
-    private static final String END_CLIENT_CMD_PREFIX = "/end";
 
     public static final String DEFAULT_HOST = "localhost";
     public static final int DEFAULT_PORT = 8180;
@@ -70,7 +68,7 @@ public class Network {
     }
 
     public void waitMessage(ChatController chatController) {
-        Thread t = new Thread(() -> {
+        Thread t = new Thread (() -> {
             try {
                 while (true) {
                     String message = in.readUTF ();
@@ -85,19 +83,21 @@ public class Network {
                         String serverMessage = parts[1];
                         Platform.runLater (() -> chatController.appendServerMessage (serverMessage));
 
-                    }  else if (message.startsWith (GET_CLIENTS_CMD_PREFIX)) {
+                    } else if (message.startsWith (GET_CLIENTS_CMD_PREFIX)) {
+                        System.out.println (message);
                         message = message.substring (message.indexOf ('[') + 1, message.indexOf (']'));
                         String[] users = message.split (", ");
+                        System.out.println ("users " + Arrays.toString (users));
                         Platform.runLater (() -> chatController.updateUsersList (users));
                     }
                 }
             } catch (IOException e) {
-                e.printStackTrace();
+                e.printStackTrace ();
             }
         });
 
-        t.setDaemon(true);
-        t.start();
+        t.setDaemon (true);
+        t.start ();
 
     }
 
@@ -117,11 +117,36 @@ public class Network {
         }
     }
 
+    public void sendChangeUsernameMessage(String oldUsername, String newUsername) {
+        try {
+            out.writeUTF (String.format ("%s %s %s", CHANGE_USERNAME_PREFIX, oldUsername, newUsername));
+            System.out.println ("sendChangeUserMessage " + oldUsername + " " + newUsername);
+        } catch (IOException e) {
+            e.printStackTrace ();
+        }
+    }
+
     public String getUsername() {
         return username;
     }
 
     public void sendPrivateMessage(String selectedRecipient, String message) {
-    sendMessage (String.format ("%s %s %s", PRIVATE_MSG_CMD_PREFIX, selectedRecipient, message));
+        sendMessage (String.format ("%s %s %s", PRIVATE_MSG_CMD_PREFIX, selectedRecipient, message));
+    }
+
+    public String sendRegMessage(String login, String password) {
+        try {
+            out.writeUTF (String.format ("%s %s %s", NEW_CLIENT_REG_PREFIX, login, password));
+            String response = in.readUTF ();
+            if (response.startsWith (CLIENT_OK_REG_PREFIX)) {
+                this.username = response.split ("\\s+", 2)[1];
+                return null;
+            } else {
+                return response.split ("\\s+",2)[1];
+            }
+        } catch (IOException e) {
+            e.printStackTrace ();
+            return e.getMessage ();
+        }
     }
 }

@@ -1,26 +1,22 @@
 package chat.server;
 
 import chat.server.authentication.AuthenticationService;
-import chat.server.authentication.BaseAuthenticationService;
+import chat.server.authentication.DBAuthenticationService;
 import chat.server.handler.ClientHandler;
-import javafx.collections.FXCollections;
-import javafx.collections.ObservableList;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.*;
 
 
-public class Server {
+public class  Server {
     private final ServerSocket serverSocket;
     private final AuthenticationService authenticationService;
     private final List<ClientHandler> clients;
 
-    ObservableList<String> list = FXCollections.observableArrayList ();
-
     public Server(int port) throws IOException {
         serverSocket = new ServerSocket(port);
-        authenticationService = new BaseAuthenticationService ();
+        authenticationService = new DBAuthenticationService ();
         clients = new ArrayList<> ();
 
     }
@@ -75,9 +71,9 @@ public class Server {
         for (ClientHandler client : clients) {
             if (client.getUsername ().equals (recipient)) {
                 client.sendMessage (sender.getUsername (), privateMessage);
-                }
             }
         }
+    }
     public synchronized void broadcastMessage(String message, ClientHandler sender, boolean isServerMessage) throws IOException {
         for (ClientHandler client : clients) {
             if (client == sender) {
@@ -105,6 +101,17 @@ public class Server {
         for (ClientHandler client : clients) {
             client.sendServerMessage (String.format ("Пользователь %s подключился", sender.getUsername ()));
             client.sendUserList (clients);
+        }
+    }
+    public void updateClientUsername (ClientHandler sender, String oldUsername, String newUsername) throws IOException {
+        sender.setUsername (newUsername);
+        for (ClientHandler client : clients) {
+            if (client == sender) {
+                client.sendUserList (clients);
+                continue;
+            }
+            client.sendUserList (clients);
+            client.sendServerMessage (String.format ("Пользователь %s сменил username на %s", oldUsername, newUsername));
         }
     }
 }
