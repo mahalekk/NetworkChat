@@ -1,13 +1,18 @@
 package chat.controllers;
 
+//import chat.LogInfo;
 import chat.StartClient;
 import chat.models.Network;
+import chat.server.Server;
+import chat.server.ServerApp;
 import javafx.fxml.FXML;
 import javafx.scene.control.*;
 import javafx.scene.input.MouseEvent;
 
-import java.io.IOException;
+import java.io.*;
 import java.text.DateFormat;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Date;
@@ -32,11 +37,20 @@ public class ChatController {
     @FXML
     private Button changeUsernameBtn;
     private String selectedRecipient;
+
+    private String logDate;
+    private String logMessage;
     private StartClient startClient;
 
     @FXML
     public void initialize() {
-        sendButton.setOnAction (event -> sendMessage ());
+        sendButton.setOnAction (event -> {
+            try {
+                sendMessage ();
+            } catch (IOException e) {
+                throw new RuntimeException (e);
+            }
+        });
         changeUsernameBtn.setOnAction (event -> {
             try {
                 changeUsername();
@@ -44,7 +58,13 @@ public class ChatController {
                 throw new RuntimeException (e);
             }
         });
-        textInputField.setOnAction (event -> sendMessage ());
+        textInputField.setOnAction (event -> {
+            try {
+                sendMessage ();
+            } catch (IOException e) {
+                throw new RuntimeException (e);
+            }
+        });
 
         usersList.setCellFactory (lv -> {
             MultipleSelectionModel<String> selectionModel = usersList.getSelectionModel ();
@@ -66,6 +86,37 @@ public class ChatController {
             });
             return cell;
         });
+        this.getUserStory();
+    }
+
+    // метод для чтения истории чата
+    private void getUserStory() {
+        try (BufferedReader reader = new BufferedReader(new FileReader(ServerApp.getFile ()))) {
+            String line;
+            ArrayList<String> list = new ArrayList<> ();
+            while ((line = reader.readLine()) != null) {
+                if(line.length () != 0) {
+                    list.add (line);
+                }
+            }
+
+            //Обработка на случай если  в чате меньше 100 сообщений
+            if (list.size () >= 100) {
+                for (int i = list.size () - 100; i <= list.size () - 1; i++) {
+                    chatHistory.appendText (list.get (i) + "\n");
+                    chatHistory.appendText (System.lineSeparator ());
+                }
+            } else {
+                for (int i = 0; i <= list.size () - 1; i++) {
+                    chatHistory.appendText (list.get (i) + "\n");
+                    chatHistory.appendText (System.lineSeparator ());
+                }
+            }
+        }
+        catch (IOException e) {
+            e.printStackTrace();
+        }
+
     }
 
     public void changeUsername() throws IOException {
@@ -79,27 +130,43 @@ public class ChatController {
         this.network = network;
     }
 
-    private void sendMessage() {
+    private void sendMessage() throws IOException {
         String message = textInputField.getText ().trim ();
         textInputField.clear ();
 
         if (message.trim ().isEmpty ()) {
             return;
         }
-
+        logDate = this.getLogDate () ;
         if (selectedRecipient != null) {
             network.sendPrivateMessage (selectedRecipient, message);
         } else {
             network.sendMessage (message);
+            this.writeMessageToLog(message);
         }
-        appendMessage ("Я: " + message);
+        appendMessage (network.getUsername () + " " + message);
+    }
+
+    // выделил метод для форматирования времени
+    private String getLogDate() {
+        DateFormat dateFormat = new SimpleDateFormat ("yyyy/MM/dd HH:mm:ss");
+        Date date = new Date();
+        return dateFormat.format(date);
+    }
+
+    // метод для записи сообщения в историю чата
+    private void writeMessageToLog(String message) {
+    try (BufferedWriter bufferedWriter = new BufferedWriter(new FileWriter(ServerApp.getFile (), true))) {
+            logMessage = logDate + " " + network.getUsername () + " " + message;
+            bufferedWriter.write(System.lineSeparator ());
+            bufferedWriter.write(logMessage + "\n");
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     public void appendMessage(String message) {
-        String timestamp = DateFormat.getInstance ().format (new Date ());
-
-        chatHistory.appendText (timestamp);
-        chatHistory.appendText (System.lineSeparator ());
+        chatHistory.appendText (logDate + " ");
         chatHistory.appendText (message);
         chatHistory.appendText (System.lineSeparator ());
         chatHistory.appendText (System.lineSeparator ());

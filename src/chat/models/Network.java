@@ -133,20 +133,4 @@ public class Network {
     public void sendPrivateMessage(String selectedRecipient, String message) {
         sendMessage (String.format ("%s %s %s", PRIVATE_MSG_CMD_PREFIX, selectedRecipient, message));
     }
-
-    public String sendRegMessage(String login, String password) {
-        try {
-            out.writeUTF (String.format ("%s %s %s", NEW_CLIENT_REG_PREFIX, login, password));
-            String response = in.readUTF ();
-            if (response.startsWith (CLIENT_OK_REG_PREFIX)) {
-                this.username = response.split ("\\s+", 2)[1];
-                return null;
-            } else {
-                return response.split ("\\s+",2)[1];
-            }
-        } catch (IOException e) {
-            e.printStackTrace ();
-            return e.getMessage ();
-        }
-    }
 }
